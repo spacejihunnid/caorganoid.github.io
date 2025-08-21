@@ -109,6 +109,15 @@
     }
     .footer{ text-align:center; font-size:11px; color:var(--muted); padding:16px 0; border-top:1px solid var(--line); margin-top:auto }
   </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // 👇 여기에 본인 프로젝트의 URL / anon 키를 넣으세요
+  const SUPABASE_URL = "https://caorganoidtracker.com";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzcnFzZGZjd2pvb2poYmF2aHltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3NDAxNjMsImV4cCI6MjA3MTMxNjE2M30.B2V7CyU9wDe2RrWmOQVLdeIMDq7SdBff8m73WeeZL6Y";
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+  
 </head>
 <body>
   <!-- Sidebar: Forms -->
@@ -363,6 +372,10 @@
       <div style="flex:1">
         <div class="muted">카테고리 필터</div>
         <div id="filterChips" class="filters" aria-live="polite"></div>
+        <div id="authBox" style="display:flex; gap:8px; align-items:center; margin-left:12px">
+  <span id="authEmail" class="muted" style="min-width:160px; display:none"></span>
+  <button id="btnOpenAuth" class="btn btn-ghost">로그인</button>
+  <button id="btnLogout" class="btn btn-ghost" style="display:none">로그아웃</button>
       </div>
       <label class="chip" title="카테고리 없는 항목 표시">
         <input type="checkbox" id="filterUncat" checked>
@@ -755,34 +768,69 @@ if (openCalendarBtn) openCalendarBtn.addEventListener('click', () => activateTab
     hookPreset(categoryPreset_o, categoryLabel_o, categoryColor_o);
     hookPreset(categoryPreset_c, categoryLabel_c, categoryColor_c);
 
-    /* -------------------- Submit: Organoid -------------------- */
-    document.getElementById('organoidForm').addEventListener('submit',e=>{
-      e.preventDefault();
-      const presetKey=categoryPreset_o.value;
-      let label=(categoryLabel_o.value||'').trim();
-      let color=categoryColor_o.value||'';
-      if(presetKey && presetKey!=='Custom' && CATEGORY_PRESETS[presetKey]){ const p=CATEGORY_PRESETS[presetKey]; if(!label) label=p.label; if(!color) color=p.color; }
-      const entry={
-        seedingDate: document.getElementById('seedingDate_o').value,
-        passage: document.getElementById('passage_o').value,
-        cellType: document.getElementById('cellType_o').value,
-        plate: document.getElementById('plate_o').value,
-        note: document.getElementById('note_o').value,
-        categoryKey:presetKey||'', categoryLabel:label, categoryColor:color,
-        status:'Ongoing'
-      };
-      if(editIndex_o!==null){
-        const prev=organoidData[editIndex_o];
-        entry.status=prev.status||'Ongoing';
-        if(prev.completedDay!==undefined) entry.completedDay=prev.completedDay;
-        if(prev.terminatedDay!==undefined) entry.terminatedDay=prev.terminatedDay;
-        if(prev.terminationReason!==undefined) entry.terminationReason=prev.terminationReason;
-        organoidData[editIndex_o]=entry; editIndex_o=null;
-      }else{ organoidData.push(entry) }
-      saveAll(); e.target.reset(); categoryColor_o.value='#7aa2ff'; categoryPreset_o.value='';
-      rebuildFilterChips(); renderList();
-    })
-    document.getElementById('resetBtn_o').addEventListener('click',()=>{ document.getElementById('organoidForm').reset(); categoryColor_o.value='#7aa2ff'; categoryPreset_o.value=''; })
+/* -------------------- Submit: Organoid -------------------- */
+document.getElementById('organoidForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+
+  const presetKey = categoryPreset_o.value;
+  let label = (categoryLabel_o.value||'').trim();
+  let color = categoryColor_o.value||'';
+  if (presetKey && presetKey!=='Custom' && CATEGORY_PRESETS[presetKey]) {
+    const p = CATEGORY_PRESETS[presetKey];
+    if (!label) label = p.label;
+    if (!color) color = p.color;
+  }
+
+  let entry = {
+    seedingDate: document.getElementById('seedingDate_o').value,
+    passage: document.getElementById('passage_o').value,
+    cellType: document.getElementById('cellType_o').value,
+    plate: document.getElementById('plate_o').value,
+    note: document.getElementById('note_o').value,
+    categoryKey: presetKey||'',
+    categoryLabel: label,
+    categoryColor: color,
+    status: 'Ongoing'
+  };
+
+  try {
+    // (선택) 로그인 체크
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) { alert('로그인이 필요합니다.'); return; }
+
+    if (editIndex_o !== null) {
+      // 수정: 기존 id/상태 유지 후 DB 업데이트
+      const prev = organoidData[editIndex_o];
+      entry.id = prev.id;                         // 기존 id
+      entry.status = prev.status || 'Ongoing';
+      if (prev.completedDay!==undefined) entry.completedDay = prev.completedDay;
+      if (prev.terminatedDay!==undefined) entry.terminatedDay = prev.terminatedDay;
+      if (prev.terminationReason!==undefined) entry.terminationReason = prev.terminationReason;
+
+      const saved = await dbUpdateOrg(entry);     // ⬅️ DB 업데이트
+      organoidData[editIndex_o] = saved;          // 메모리 반영
+      editIndex_o = null;
+    } else {
+      // 신규: DB 인서트 → 반환값으로 배열 갱신
+      const saved = await dbInsertOrg(entry);     // ⬅️ DB 인서트
+      organoidData.push(saved);                   // 메모리 반영
+    }
+
+    // 로컬 캐시만 저장 (서버 저장은 위에서 완료)
+    saveAllLocalOnly();
+
+    // UI 초기화/리렌더 (기존 그대로 유지)
+    e.target.reset();
+    categoryColor_o.value = '#7aa2ff';
+    categoryPreset_o.value = '';
+    rebuildFilterChips();
+    renderList();
+
+  } catch (err) {
+    alert('저장 실패: ' + err.message);
+  }
+});
+
 
     /* -------------------- Submit: Cell -------------------- */
     document.getElementById('cellForm').addEventListener('submit',e=>{
@@ -1254,6 +1302,316 @@ if (openCalendarBtn) openCalendarBtn.addEventListener('click', () => activateTab
       missions.forEach(m=>{ const li=document.createElement('li'); li.textContent=m; list.appendChild(li); });
     }
 
+
+    <script>
+/* =============== AUTH =============== */
+const authModal = document.getElementById('authModal');
+const btnOpenAuth = document.getElementById('btnOpenAuth');
+const btnCloseAuth = document.getElementById('btnCloseAuth');
+const btnSignIn = document.getElementById('btnSignIn');
+const btnSignUp = document.getElementById('btnSignUp');
+const btnLogout = document.getElementById('btnLogout');
+const authEmailSpan = document.getElementById('authEmail');
+const authMsg = document.getElementById('authMsg');
+const authEmailInput = document.getElementById('authEmailInput');
+const authPwInput = document.getElementById('authPwInput');
+
+btnOpenAuth.addEventListener('click', ()=>{ authMsg.textContent=''; authModal.style.display='grid'; });
+btnCloseAuth.addEventListener('click', ()=>{ authModal.style.display='none'; });
+
+btnSignUp.addEventListener('click', async ()=>{
+  authMsg.textContent = '처리 중...';
+  const { data, error } = await supabase.auth.signUp({
+    email: authEmailInput.value.trim(),
+    password: authPwInput.value
+  });
+  if(error){ authMsg.textContent = '회원가입 실패: ' + error.message; return; }
+  authMsg.textContent = '회원가입 성공. 메일 인증이 요구될 수 있습니다.';
+});
+
+btnSignIn.addEventListener('click', async ()=>{
+  authMsg.textContent = '처리 중...';
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: authEmailInput.value.trim(),
+    password: authPwInput.value
+  });
+  if(error){ authMsg.textContent = '로그인 실패: ' + error.message; return; }
+  authModal.style.display='none';
+});
+
+btnLogout.addEventListener('click', async ()=>{
+  await supabase.auth.signOut();
+});
+
+supabase.auth.onAuthStateChange(async (_evt, session)=>{
+  const user = session?.user || null;
+  if(user){
+    authEmailSpan.style.display='inline';
+    authEmailSpan.textContent = user.email || '';
+    btnOpenAuth.style.display='none';
+    btnLogout.style.display='inline-block';
+
+    // 로그인 시 서버에서 데이터 로딩
+    await loadAllFromDB();
+    // 렌더링
+    rebuildFilterChips();
+    renderList();
+    populateExpPicker();
+    renderExperimentUI();
+    renderCalendar();
+    renderMissions();
+  }else{
+    authEmailSpan.style.display='none';
+    btnOpenAuth.style.display='inline-block';
+    btnLogout.style.display='none';
+
+    // 로그아웃 시 메모리/로컬 초기화(원한다면 localStorage 유지 가능)
+    organoidData = [];
+    cellData = [];
+    experimentData = [];
+    calendarEvents = [];
+    localStorage.removeItem('organoidData');
+    localStorage.removeItem('cellData');
+    localStorage.removeItem('experimentData');
+    localStorage.removeItem('calendarEvents');
+    renderList(); renderExperimentUI(); renderCalendar(); renderMissions();
+  }
+});
+
+/* =============== DB ADAPTER =============== */
+function currentUserId(){
+  return supabase.auth.getUser().then(({data})=>data.user?.id||null);
+}
+
+async function loadAllFromDB(){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if(!uid) return;
+
+  const [org, cells, exps, evs] = await Promise.all([
+    supabase.from('organoids').select('*').order('created_at',{ascending:true}),
+    supabase.from('cells').select('*').order('created_at',{ascending:true}),
+    supabase.from('experiments').select('*').order('created_at',{ascending:true}),
+    supabase.from('calendar_events').select('*').order('created_at',{ascending:true}),
+  ]);
+
+  organoidData = (org.data||[]).map(mapOrgFromDB);
+  cellData     = (cells.data||[]).map(mapCellFromDB);
+  experimentData = (exps.data||[]).map(mapExpFromDB);
+  calendarEvents = (evs.data||[]).map(mapEventFromDB);
+
+  saveAllLocalOnly(); // localStorage에 캐시(오프라인 대비)
+}
+
+/* 매핑: DB ↔ UI 오브젝트 */
+function mapOrgFromDB(r){
+  return {
+    id: r.id,
+    seedingDate: r.seeding_date || '',
+    passage: r.passage ?? '',
+    cellType: r.cell_type || '',
+    plate: r.plate || '',
+    note: r.note || '',
+    categoryKey: r.category_key || '',
+    categoryLabel: r.category_label || '',
+    categoryColor: r.category_color || '',
+    status: r.status || 'Ongoing',
+    completedDay: r.completed_day,
+    terminatedDay: r.terminated_day,
+    terminationReason: r.termination_reason
+  };
+}
+function mapOrgToDB(o, uid){
+  return {
+    id: o.id,
+    user_id: uid,
+    seeding_date: o.seedingDate || null,
+    passage: o.passage? Number(o.passage) : null,
+    cell_type: o.cellType || null,
+    plate: o.plate || null,
+    note: o.note || null,
+    category_key: o.categoryKey || null,
+    category_label: o.categoryLabel || null,
+    category_color: o.categoryColor || null,
+    status: o.status || 'Ongoing',
+    completed_day: (typeof o.completedDay==='number')? o.completedDay : null,
+    terminated_day: (typeof o.terminatedDay==='number')? o.terminatedDay : null,
+    termination_reason: o.terminationReason || null
+  };
+}
+
+function mapCellFromDB(r){
+  return {
+    id: r.id,
+    cultivationDate: r.cultivation_date || '',
+    passage: r.passage ?? '',
+    cellType: r.cell_type || '',
+    plate: r.plate || '',
+    note: r.note || '',
+    categoryKey: r.category_key || '',
+    categoryLabel: r.category_label || '',
+    categoryColor: r.category_color || '',
+    status: r.status || 'Ongoing',
+    completedDay: r.completed_day,
+    terminatedDay: r.terminated_day,
+    terminationReason: r.termination_reason
+  };
+}
+function mapCellToDB(c, uid){
+  return {
+    id: c.id,
+    user_id: uid,
+    cultivation_date: c.cultivationDate || null,
+    passage: c.passage? Number(c.passage) : null,
+    cell_type: c.cellType || null,
+    plate: c.plate || null,
+    note: c.note || null,
+    category_key: c.categoryKey || null,
+    category_label: c.categoryLabel || null,
+    category_color: c.categoryColor || null,
+    status: c.status || 'Ongoing',
+    completed_day: (typeof c.completedDay==='number')? c.completedDay : null,
+    terminated_day: (typeof c.terminatedDay==='number')? c.terminatedDay : null,
+    termination_reason: c.terminationReason || null
+  };
+}
+
+function mapExpFromDB(r){
+  return {
+    id: r.id,
+    startDate: r.start_date || '',
+    expType: r.exp_type || '',
+    cellType: r.cell_type || '',
+    markers: r.markers || '',
+    progress: r.progress ?? 0,
+    note: r.note || '',
+    status: r.status || 'Ongoing',
+    terminationReason: r.termination_reason
+  };
+}
+function mapExpToDB(e, uid){
+  return {
+    id: e.id,
+    user_id: uid,
+    start_date: e.startDate || null,
+    exp_type: e.expType || null,
+    cell_type: e.cellType || null,
+    markers: e.markers || null,
+    progress: e.progress? Number(e.progress) : 0,
+    note: e.note || null,
+    status: e.status || 'Ongoing',
+    termination_reason: e.terminationReason || null
+  };
+}
+
+function mapEventFromDB(r){
+  return {
+    id: r.id,
+    title: r.title,
+    date: r.date,
+    start: r.start || '',
+    end: r.end || '',
+    color: r.color || '#7aa2ff',
+    note: r.note || ''
+  };
+}
+function mapEventToDB(ev, uid){
+  return {
+    id: ev.id,
+    user_id: uid,
+    title: ev.title,
+    date: ev.date,
+    start: ev.start || null,
+    end: ev.end || null,
+    color: ev.color || null,
+    note: ev.note || null
+  };
+}
+
+/* 로컬 캐시만 저장 (기존 saveAll 대체용) */
+function saveAllLocalOnly(){
+  localStorage.setItem('organoidData', JSON.stringify(organoidData));
+  localStorage.setItem('cellData', JSON.stringify(cellData));
+  localStorage.setItem('experimentData', JSON.stringify(experimentData));
+  localStorage.setItem('activeExperimentId', activeExperimentId || '');
+  localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+}
+
+/* 서버 반영: 항목별 CRUD */
+async function dbInsertOrg(o){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapOrgToDB(o, uid);
+  const { data, error } = await supabase.from('organoids').insert(row).select().single();
+  if(error) throw error;
+  return mapOrgFromDB(data);
+}
+async function dbUpdateOrg(o){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapOrgToDB(o, uid);
+  const { data, error } = await supabase.from('organoids').update(row).eq('id', o.id).select().single();
+  if(error) throw error;
+  return mapOrgFromDB(data);
+}
+async function dbDeleteOrg(id){
+  const { error } = await supabase.from('organoids').delete().eq('id', id);
+  if(error) throw error;
+}
+
+async function dbInsertCell(c){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapCellToDB(c, uid);
+  const { data, error } = await supabase.from('cells').insert(row).select().single();
+  if(error) throw error;
+  return mapCellFromDB(data);
+}
+async function dbUpdateCell(c){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapCellToDB(c, uid);
+  const { data, error } = await supabase.from('cells').update(row).eq('id', c.id).select().single();
+  if(error) throw error;
+  return mapCellFromDB(data);
+}
+async function dbDeleteCell(id){
+  const { error } = await supabase.from('cells').delete().eq('id', id);
+  if(error) throw error;
+}
+
+async function dbInsertExp(e){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapExpToDB(e, uid);
+  const { data, error } = await supabase.from('experiments').insert(row).select().single();
+  if(error) throw error;
+  return mapExpFromDB(data);
+}
+async function dbUpdateExp(e){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapExpToDB(e, uid);
+  const { data, error } = await supabase.from('experiments').update(row).eq('id', e.id).select().single();
+  if(error) throw error;
+  return mapExpFromDB(data);
+}
+async function dbDeleteExp(id){
+  const { error } = await supabase.from('experiments').delete().eq('id', id);
+  if(error) throw error;
+}
+
+async function dbInsertEvent(ev){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapEventToDB(ev, uid);
+  const { data, error } = await supabase.from('calendar_events').insert(row).select().single();
+  if(error) throw error;
+  return mapEventFromDB(data);
+}
+async function dbUpdateEvent(ev){
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const row = mapEventToDB(ev, uid);
+  const { data, error } = await supabase.from('calendar_events').update(row).eq('id', ev.id).select().single();
+  if(error) throw error;
+  return mapEventFromDB(data);
+}
+async function dbDeleteEvent(id){
+  const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+  if(error) throw error;
+}
     /* -------------------- Init -------------------- */
     function populateExpPicker(){
       const sel = expPicker; sel.innerHTML = '';
@@ -1277,5 +1635,29 @@ if (openCalendarBtn) openCalendarBtn.addEventListener('click', () => activateTab
     }
     initialDraw();
   </script>
+<!-- 간단 모달 -->
+<div id="authModal" style="position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.45); z-index:9999">
+  <div class="panel" style="width:380px">
+    <h3 style="margin-top:0">로그인 / 회원가입</h3>
+    <div class="row">
+      <div>
+        <label>이메일</label>
+        <input type="email" id="authEmailInput" placeholder="you@example.com">
+      </div>
+      <div>
+        <label>비밀번호</label>
+        <input type="password" id="authPwInput" placeholder="8자 이상">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:12px">
+      <button id="btnSignIn" class="btn btn-primary">로그인</button>
+      <button id="btnSignUp" class="btn btn-ghost">회원가입</button>
+      <button id="btnCloseAuth" class="btn btn-ghost" style="margin-left:auto">닫기</button>
+    </div>
+    <div id="authMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+</div>
+  
 </body>
 </html>
+
