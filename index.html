@@ -1,11 +1,1281 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>My GitHub Page</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organoid & Cell & Experiment Tracker</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#11162a; --panel-2:#0f1426; --text:#dfe7ff; --muted:#8ea2d6;
+      --line:#1c2542; --primary:#7aa2ff; --accent:#9ef0ff; --success:#35d49a; --warn:#f6c249; --danger:#ff6b6b;
+      --radius:14px; --gap:14px; --shadow:0 8px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:linear-gradient(180deg,#0b1020 0%,#0a0f1d 100%); color:var(--text); font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; display:flex;}
+
+    /* ---------- Layout ---------- */
+    .sidebar{width:360px; padding:22px; border-right:1px solid var(--line); backdrop-filter: blur(6px); background:linear-gradient(180deg,rgba(17,22,42,.65),rgba(17,22,42,.35)); display:flex; flex-direction:column; min-height:100vh}
+    .content{flex:1; display:flex; flex-direction:column;}
+    .toolbar{display:flex; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--line); background:linear-gradient(180deg,rgba(15,20,38,.7),rgba(15,20,38,.4)); position:sticky; top:0; z-index:5}
+
+    h1{font-size:20px; margin:0; letter-spacing:.2px}
+
+    /* ---------- Tabs ---------- */
+    .tabs{display:flex; gap:10px;}
+    .tab-btn{appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--text); padding:8px 12px; border-radius:999px; cursor:pointer; transition:.2s}
+    .tab-btn.active{background:var(--primary); color:#081126; border-color:transparent; box-shadow:0 8px 20px rgba(122,162,255,.35)}
+
+    /* ---------- Sidebar bottom calendar button ---------- */
+    .side-spacer{flex:1}
+    .cal-launch{appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; transition:.2s}
+    .cal-launch:hover{transform:translateY(-1px); border-color:var(--primary)}
+
+    /* ---------- Cards & Inputs ---------- */
+    .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow)}
+    .panel + .panel{margin-top:16px}
+    label{font-size:12px; color:var(--muted)}
+    input, select, textarea{width:100%; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none; transition:.2s}
+    input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shadow:0 0 0 3px rgba(122,162,255,.2)}
+    textarea{min-height:80px; resize:vertical}
+    .row{display:grid; grid-template-columns:repeat(2,1fr); gap:var(--gap)}
+    .row-3{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--gap)}
+    .row + .row{margin-top:var(--gap)}
+
+    .btn{appearance:none; border:none; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer; transition:.2s}
+    .btn-primary{background:var(--primary); color:#0a1020}
+    .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--text)}
+    .btn:hover{transform:translateY(-1px)}
+
+    /* ---------- List ---------- */
+    .columns{display:grid; grid-template-columns:1fr 1fr; gap:18px; padding:18px}
+    .section-title{margin:6px 0 10px; color:var(--muted); font-weight:700; letter-spacing:.2px}
+    .entry{position:relative; padding:12px 12px 12px 16px; border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg,#121835,#0f1430)}
+    .entry + .entry{margin-top:12px}
+    .left-bar{position:absolute; left:-1px; top:-1px; bottom:-1px; width:8px; border-radius:12px 0 0 12px; background:transparent}
+    .entry h4{margin:0 0 6px 0; font-size:14px}
+    .meta{font-size:12px; color:var(--muted); line-height:1.6}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); margin-left:8px}
+    .dot{width:10px; height:10px; border-radius:50%; border:1px solid rgba(0,0,0,.25)}
+
+    .entry-actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+    .act{border-radius:10px; padding:6px 10px; border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--text); cursor:pointer}
+    .act.edit{border-color:rgba(53,212,154,.4)}
+    .act.done{border-color:rgba(122,162,255,.45)}
+    .act.kill{border-color:rgba(255,107,107,.45)}
+
+    /* ---------- Filter chips ---------- */
+    .filters{display:flex; flex-wrap:wrap; gap:10px}
+    .chip{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); padding:8px 12px; border-radius:999px; background:rgba(255,255,255,.04); cursor:pointer; user-select:none}
+    .chip input{margin:0}
+    .muted{color:var(--muted); font-size:12px}
+
+    /* ---------- Experiment Banner ---------- */
+    .exp-banner{width:100%; padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg,#121835,#0f1430); display:none; margin:10px 20px}
+    .exp-bar{flex:1; height:10px; border-radius:999px; background:#1c2542; overflow:hidden; margin-left:18px}
+    .exp-bar>div{height:100%; width:0%; background:linear-gradient(90deg, var(--primary), var(--accent)); transition:width .25s ease}
+
+    /* ---------- Calendar View ---------- */
+    .cal-root{display:none; padding:16px;}
+    .cal-wrap{display:flex; gap:16px}
+    .cal-main{flex:1}
+    .cal-toolbar{display:flex; align-items:center; gap:8px; margin:8px 0 12px}
+    .cal-toolbar .btn-ghost{padding:8px 10px; border-radius:10px}
+    .cal-grid{ display:grid; grid-template-columns: repeat(7, 1fr); gap:8px; }
+    .cal-head, .cal-cell{ background:linear-gradient(180deg,#121835,#0f1430); border:1px solid var(--line); border-radius:10px; padding:10px; min-height:90px; position:relative }
+    .cal-head{ font-weight:600; text-align:center; color:var(--muted) }
+    .cal-cell .date{ font-weight:700; font-size:13px; color:var(--muted) }
+    .cal-cell.today{ outline:2px solid var(--primary); outline-offset:2px }
+    .cal-cell.selected{ box-shadow: 0 0 0 2px var(--warn) inset; }
+    .pill{ display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:3px 8px; margin:4px 0 0; font-size:12px; background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--line)}
+    .pill .dot{ width:10px; height:10px; border-radius:50%; border:1px solid rgba(0,0,0,.15) }
+
+    .cal-side{ width:360px; }
+
+    /* ✅ 오늘의 Mission */
+    .mission{background:linear-gradient(180deg,#131a3a,#0f1430); border:1px solid var(--line); border-radius:var(--radius); padding:14px; box-shadow:var(--shadow)}
+    .mission h3{margin:0 0 10px 0; font-size:15px}
+    .mission ul{margin:0; padding-left:18px}
+    .mission li{margin:6px 0}
+    .mission .muted{color:var(--muted); font-size:12px}
+
+    /* ---------- Responsive ---------- */
+    @media (max-width:1180px){
+      .columns{grid-template-columns:1fr}
+      .sidebar{width:100%; position:sticky; top:0; z-index:10}
+      body{flex-direction:column}
+      .cal-wrap{flex-direction:column}
+      .cal-side{width:100%}
+    }
+    .footer{ text-align:center; font-size:11px; color:var(--muted); padding:16px 0; border-top:1px solid var(--line); margin-top:auto }
+  </style>
 </head>
 <body>
-  <h1>Hello, World!</h1>
-  <p>이건 GitHub Pages로 만든 내 첫 웹사이트!</p>
+  <!-- Sidebar: Forms -->
+  <aside class="sidebar">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
+      <div>
+        <h1>Bio Lab Tracker</h1>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" id="tab-organoid" aria-selected="true">Organoid</button>
+        <button class="tab-btn" id="tab-cell" aria-selected="false">Cell</button>
+        <button class="tab-btn" id="tab-exp" aria-selected="false">Experiment</button>
+        <!-- Calendar 탭 제거(독립 버튼 사용) -->
+      </div>
+    </div>
+
+    <!-- ORGANOID FORM -->
+    <section class="panel" id="form-organoid" role="tabpanel" aria-labelledby="tab-organoid">
+      <h3 style="margin-top:0">Organoid 입력</h3>
+      <form id="organoidForm">
+        <div class="row">
+          <div>
+            <label>Cell Seeding 날짜</label>
+            <input type="date" id="seedingDate_o" required />
+          </div>
+          <div>
+            <label>Passage number</label>
+            <input type="number" id="passage_o" required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Cell 종류</label>
+            <input type="text" id="cellType_o" required />
+          </div>
+          <div>
+            <label>Plate</label>
+            <input type="text" id="plate_o" required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>카테고리(프리셋)</label>
+            <select id="categoryPreset_o">
+              <option value="">선택 안 함</option>
+              <option value="Healthy">Healthy</option>
+              <option value="Warning">Warning</option>
+              <option value="Risk">Risk</option>
+              <option value="QC">QC</option>
+              <option value="Control">Control</option>
+              <option value="TreatmentA">TreatmentA</option>
+              <option value="TreatmentB">TreatmentB</option>
+              <option value="Archive">Archive</option>
+              <option value="Custom">Custom…</option>
+            </select>
+          </div>
+          <div>
+            <label>라벨</label>
+            <input type="text" id="categoryLabel_o" placeholder="예: Healthy 또는 사용자 정의" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>색상</label>
+            <input type="color" id="categoryColor_o" value="#7aa2ff" />
+          </div>
+          <div>
+            <label>비고</label>
+            <input type="text" id="note_o" placeholder="메모" />
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:14px">
+          <button type="submit" class="btn btn-primary" id="submitBtn_o">추가하기</button>
+          <button type="button" class="btn btn-ghost" id="resetBtn_o">초기화</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ✅ 오늘의 Mission (Organoid 폼 아래, 캘린더 버튼 위) -->
+    <section class="panel mission" id="missionPanel" aria-live="polite">
+      <h3>오늘의 Mission</h3>
+      <ul id="missionList"><li class="muted">분석 중…</li></ul>
+    </section>
+
+    <!-- CELL FORM -->
+    <section class="panel" id="form-cell" role="tabpanel" aria-labelledby="tab-cell" hidden>
+      <h3 style="margin-top:0">Cell 입력</h3>
+      <form id="cellForm">
+        <div class="row">
+          <div>
+            <label>Cultivation 날짜</label>
+            <input type="date" id="cultivationDate_c" required />
+          </div>
+          <div>
+            <label>Passage number</label>
+            <input type="number" id="passage_c" required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Cell 종류</label>
+            <input type="text" id="cellType_c" required />
+          </div>
+          <div>
+            <label>Plate</label>
+            <input type="text" id="plate_c" required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>카테고리(프리셋)</label>
+            <select id="categoryPreset_c">
+              <option value="">선택 안 함</option>
+              <option value="Healthy">Healthy</option>
+              <option value="Warning">Warning</option>
+              <option value="Risk">Risk</option>
+              <option value="QC">QC</option>
+              <option value="Control">Control</option>
+              <option value="TreatmentA">TreatmentA</option>
+              <option value="TreatmentB">TreatmentB</option>
+              <option value="Archive">Archive</option>
+              <option value="Custom">Custom…</option>
+            </select>
+          </div>
+          <div>
+            <label>라벨</label>
+            <input type="text" id="categoryLabel_c" placeholder="예: Healthy 또는 사용자 정의" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>색상</label>
+            <input type="color" id="categoryColor_c" value="#7aa2ff" />
+          </div>
+          <div>
+            <label>비고</label>
+            <input type="text" id="note_c" placeholder="메모" />
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:14px">
+          <button type="submit" class="btn btn-primary" id="submitBtn_c">추가하기</button>
+          <button type="button" class="btn btn-ghost" id="resetBtn_c">초기화</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- EXPERIMENT FORM -->
+    <section class="panel" id="form-exp" role="tabpanel" aria-labelledby="tab-exp" hidden>
+      <h3 style="margin-top:0">Experiment 입력</h3>
+      <form id="expForm">
+        <div class="row">
+          <div>
+            <label>최초 시작 날짜</label>
+            <input type="date" id="startDate_e" required />
+          </div>
+          <div>
+            <label>실험 종류</label>
+            <input type="text" id="expType_e" placeholder="예: Drug Response, Hypoxia 등" required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Cell 종류</label>
+            <input type="text" id="cellType_e" required />
+          </div>
+          <div>
+            <label>확인 Marker</label>
+            <input type="text" id="markers_e" placeholder="예: IL-6, TNF-α, cTnT" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>현재 진행률 (%)</label>
+            <input type="range" id="progress_e" min="0" max="100" step="1" value="0" />
+          </div>
+          <div>
+            <label>진행률 숫자</label>
+            <input type="number" id="progressNum_e" min="0" max="100" step="1" value="0" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>비고</label>
+            <input type="text" id="note_e" placeholder="메모" />
+          </div>
+          <div>
+            <label>상태</label>
+            <select id="status_e">
+              <option value="Ongoing">Ongoing</option>
+              <option value="Paused">Paused</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:14px">
+          <button type="submit" class="btn btn-primary" id="submitBtn_e">추가하기</button>
+          <button type="button" class="btn btn-ghost" id="resetBtn_e">초기화</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- CALENDAR FORM (Calendar 보기에서만 표시) -->
+    <section class="panel" id="form-cal" hidden>
+      <h3 style="margin-top:0">일정 추가/수정</h3>
+      <form id="eventForm">
+        <input type="hidden" id="evId" value="">
+        <div class="row">
+          <div>
+            <label>제목</label>
+            <input type="text" id="evTitle" required placeholder="할 일 / 일정 제목" />
+          </div>
+          <div>
+            <label>날짜</label>
+            <input type="date" id="evDate" required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>시작</label>
+            <input type="time" id="evStart" />
+          </div>
+          <div>
+            <label>종료</label>
+            <input type="time" id="evEnd" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>색상</label>
+            <input type="color" id="evColor" value="#7aa2ff" />
+          </div>
+          <div>
+            <label>비고</label>
+            <input type="text" id="evNote" placeholder="메모" />
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:14px">
+          <button type="submit" class="btn btn-primary" id="evSubmitBtn">추가</button>
+          <button type="button" class="btn btn-ghost" id="evResetBtn">초기화</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="side-spacer"></div>
+    <!-- 왼쪽 하단 독립 Calendar 버튼 -->
+    <button class="cal-launch" id="openCalendarBtn">📅 Calendar</button>
+  </aside>
+
+  <!-- Main content: Lists & Filters & Calendar -->
+  <main class="content">
+    <div class="toolbar" id="mainToolbar">
+      <div style="flex:1">
+        <div class="muted">카테고리 필터</div>
+        <div id="filterChips" class="filters" aria-live="polite"></div>
+      </div>
+      <label class="chip" title="카테고리 없는 항목 표시">
+        <input type="checkbox" id="filterUncat" checked>
+        <span class="dot" style="background:#5b6a99"></span>
+        <span>미지정</span>
+      </label>
+      <button id="clearFilterBtn" class="btn btn-ghost">필터 지우기</button>
+
+      <div style="display:flex; flex-direction:column; gap:8px; min-width:300px; margin-left:12px">
+        <label class="muted">현재 진행중인 실험 선택</label>
+        <div style="display:flex; gap:8px; align-items:center">
+          <select id="expPicker" class="btn-ghost" style="padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); min-width:220px"></select>
+          <button id="expClear" class="btn btn-ghost">해제</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="expBanner" class="exp-banner">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px">
+        <div style="font-weight:700">실험: <span id="expBannerType"></span> <span class="muted" id="expBannerMeta"></span></div>
+        <div class="exp-bar"><div id="expBannerBar"></div></div>
+        <div id="expBannerPct" style="width:48px; text-align:right">0%</div>
+      </div>
+    </div>
+
+    <!-- Lists -->
+    <section id="listsSection" style="padding:14px">
+      <div class="columns">
+        <div>
+          <div class="section-title">Ongoing</div>
+          <div id="ongoingList" class="panel"></div>
+        </div>
+        <div>
+          <div class="section-title">Completed</div>
+          <div id="completedList" class="panel"></div>
+          <div class="section-title" style="margin-top:18px">Terminated</div>
+          <div id="terminatedList" class="panel"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ✅ Experiments: 상태별 분리 -->
+    <section id="experimentsSection" style="padding:14px">
+      <div class="columns">
+        <div>
+          <div class="section-title">Ongoing</div>
+          <div id="expOngoingList" class="panel"></div>
+        </div>
+        <div>
+          <div class="section-title">Completed</div>
+          <div id="expCompletedList" class="panel"></div>
+          <div class="section-title" style="margin-top:18px">Terminated</div>
+          <div id="expTerminatedList" class="panel"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Calendar -->
+    <section id="calendarSection" class="cal-root">
+      <div class="cal-wrap">
+        <div class="cal-main">
+          <div class="cal-toolbar">
+            <button class="btn btn-ghost" id="prevMonth">◀</button>
+            <div id="monthLabel" class="badge" style="font-weight:800"></div>
+            <button class="btn btn-ghost" id="nextMonth">▶</button>
+            <button class="btn btn-ghost" id="goToday" style="margin-left:8px">오늘</button>
+          </div>
+          <div class="cal-grid" id="calHead"></div>
+          <div class="cal-grid" id="calGrid" style="margin-top:8px"></div>
+        </div>
+        <aside class="cal-side">
+          <div class="panel">
+            <div class="section-title">오늘 해야 할 일</div>
+            <div id="todayList"></div>
+          </div>
+          <div class="panel" style="margin-top:16px">
+            <div class="section-title">선택한 날짜</div>
+            <div id="selectedDateLabel" class="muted" style="margin:4px 0 8px">-</div>
+            <div id="selectedList"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <footer class="footer">ⓒ2025 KUMC CA Lab. All rights reserved.</footer>
+  </main>
+
+  <script>
+    /* -------------------- Category Presets -------------------- */
+    const CATEGORY_PRESETS = {
+      Healthy:   { label: 'Healthy',     color: '#35d49a' },
+      Warning:   { label: 'Warning',     color: '#f6c249' },
+      Risk:      { label: 'Risk',        color: '#ff6b6b' },
+      QC:        { label: 'QC',          color: '#b079ff' },
+      Control:   { label: 'Control',     color: '#7aa2ff' },
+      TreatmentA:{ label: 'Treatment A', color: '#2fd7ff' },
+      TreatmentB:{ label: 'Treatment B', color: '#27c1f5' },
+      Archive:   { label: 'Archive',     color: '#7f8c8d' },
+    };
+
+    /* -------------------- State -------------------- */
+    let organoidData = JSON.parse(localStorage.getItem('organoidData')) || [];
+    let cellData     = JSON.parse(localStorage.getItem('cellData'))     || [];
+    let experimentData = JSON.parse(localStorage.getItem('experimentData')) || [];
+    let calendarEvents = JSON.parse(localStorage.getItem('calendarEvents')) || [];
+
+    let activeType = 'organoid'; // 'organoid' | 'cell' | 'experiment' | 'calendar'
+    let editIndex_o = null;
+    let editIndex_c = null;
+    let editIndex_e = null;
+
+    let activeCategorySet = new Set();
+    let includeUncategorized = true;
+    let activeExperimentId = localStorage.getItem('activeExperimentId') || '';
+
+    /* -------------------- Elements -------------------- */
+const tabOrg = document.getElementById('tab-organoid');
+const tabCell = document.getElementById('tab-cell');
+const tabExp  = document.getElementById('tab-exp');
+const openCalendarBtn = document.getElementById('openCalendarBtn');
+
+const formOrg = document.getElementById('form-organoid');
+const formCel = document.getElementById('form-cell');
+const formExp = document.getElementById('form-exp');
+const formCal = document.getElementById('form-cal');
+
+const categoryPreset_o = document.getElementById('categoryPreset_o');
+const categoryLabel_o  = document.getElementById('categoryLabel_o');
+const categoryColor_o  = document.getElementById('categoryColor_o');
+
+const categoryPreset_c = document.getElementById('categoryPreset_c');
+const categoryLabel_c  = document.getElementById('categoryLabel_c');
+const categoryColor_c  = document.getElementById('categoryColor_c');
+
+const filterChips    = document.getElementById('filterChips');
+const filterUncat    = document.getElementById('filterUncat');
+const clearFilterBtn = document.getElementById('clearFilterBtn');
+
+const ongoingList    = document.getElementById('ongoingList');
+const completedList  = document.getElementById('completedList');
+const terminatedList = document.getElementById('terminatedList');
+
+const expPicker     = document.getElementById('expPicker');
+const expClear      = document.getElementById('expClear');
+const expBanner     = document.getElementById('expBanner');
+const expBannerType = document.getElementById('expBannerType');
+const expBannerMeta = document.getElementById('expBannerMeta');
+const expBannerBar  = document.getElementById('expBannerBar');
+const expBannerPct  = document.getElementById('expBannerPct');
+
+const mainToolbar        = document.getElementById('mainToolbar');
+const listsSection       = document.getElementById('listsSection');
+const experimentsSection = document.getElementById('experimentsSection');
+const calendarSection    = document.getElementById('calendarSection');
+
+// Calendar elements
+const calHead   = document.getElementById('calHead');
+const calGrid   = document.getElementById('calGrid');
+const monthLabel= document.getElementById('monthLabel');
+const prevMonthBtn = document.getElementById('prevMonth');
+const nextMonthBtn = document.getElementById('nextMonth');
+const todayBtn     = document.getElementById('goToday');
+
+const eventForm = document.getElementById('eventForm');
+const evId    = document.getElementById('evId');
+const evTitle = document.getElementById('evTitle');
+const evDate  = document.getElementById('evDate');
+const evStart = document.getElementById('evStart');
+const evEnd   = document.getElementById('evEnd');
+const evColor = document.getElementById('evColor');
+const evNote  = document.getElementById('evNote');
+const evSubmitBtn = document.getElementById('evSubmitBtn');
+const evResetBtn  = document.getElementById('evResetBtn');
+
+const todayList         = document.getElementById('todayList');
+const selectedList      = document.getElementById('selectedList');
+const selectedDateLabel = document.getElementById('selectedDateLabel');
+
+/* ---- 탭/버튼 클릭 리스너 (한 번만 등록) ---- */
+if (tabOrg) tabOrg.addEventListener('click', () => activateTab('organoid'));
+if (tabCell) tabCell.addEventListener('click', () => activateTab('cell'));
+if (tabExp)  tabExp.addEventListener('click',  () => activateTab('experiment'));
+if (openCalendarBtn) openCalendarBtn.addEventListener('click', () => activateTab('calendar'));
+
+    /* -------------------- Utils -------------------- */
+    function pad(n){ return String(n).padStart(2,'0'); }
+    function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+    function calculateDiff(seedingDate){
+      const today=new Date();
+      const seed=new Date(seedingDate);
+      seed.setDate(seed.getDate()+1);
+      const diff=Math.floor((today-seed)/(1000*60*60*24));
+      return diff>=0?diff:-1;
+    }
+    function getPhaseLabel(day){
+      if (day===0) return 'CHIR';
+      if (day===2) return 'IWP-2';
+      if (day===4||day===5) return '-Ins';
+      if (day===7) return '-VitA';
+      if (day>7 && (day-7)%3===0) return '-VitA';
+      return '';
+    }
+    function hydrateDefaults(arr, type){
+      arr.forEach(d=>{
+        if (!d.status) d.status='Ongoing';
+        if (typeof d.categoryLabel==='undefined') d.categoryLabel='';
+        if (typeof d.categoryColor==='undefined') d.categoryColor='';
+        if (typeof d.categoryKey==='undefined') d.categoryKey='';
+        if (type==='cell' && typeof d.cultivationDate==='undefined' && d.seedingDate) {
+          d.cultivationDate=d.seedingDate; delete d.seedingDate;
+        }
+      })
+    }
+    function hydrateExperiments(){
+      experimentData.forEach(e=>{
+        if(!e.id) e.id = 'exp_'+Math.random().toString(36).slice(2,10);
+        if(typeof e.progress==='undefined') e.progress=0;
+        if(!e.status) e.status='Ongoing';
+      });
+    }
+    function saveAll(){
+      localStorage.setItem('organoidData', JSON.stringify(organoidData));
+      localStorage.setItem('cellData', JSON.stringify(cellData));
+      localStorage.setItem('experimentData', JSON.stringify(experimentData));
+      localStorage.setItem('activeExperimentId', activeExperimentId || '');
+      localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+      renderMissions(); // ✅ 저장 때마다 미션 갱신
+    }
+
+    /* -------------------- Filters (Organoid/Cell) -------------------- */
+    function getAllCategoryStats(){
+      const source = activeType==='organoid'?organoidData:cellData;
+      const map=new Map();
+      for(const d of source){
+        const label=(d.categoryLabel||'').trim();
+        const color=(d.categoryColor||'#7aa2ff');
+        if(!label) continue;
+        if(!map.has(label)) map.set(label,{color,count:0});
+        map.get(label).count++;
+      }
+      return map;
+    }
+    function rebuildFilterChips(){
+      const stats=getAllCategoryStats();
+      filterChips.innerHTML='';
+      for(const [label,info] of [...stats.entries()].sort((a,b)=>a[0].localeCompare(b[0]))){
+        const el=document.createElement('label');
+        el.className='chip';
+        el.innerHTML=`<input type="checkbox" ${activeCategorySet.has(label)?'checked':''} data-label="${label}"><span class="dot" style="background:${info.color}"></span><span>${label}</span><span class="muted">(${info.count})</span>`;
+        el.querySelector('input').addEventListener('change',e=>{
+          const l=e.target.getAttribute('data-label');
+          if(e.target.checked) activeCategorySet.add(l); else activeCategorySet.delete(l);
+          renderList();
+        })
+        filterChips.appendChild(el);
+      }
+      filterUncat.checked=includeUncategorized;
+    }
+    function passCategoryFilter(d){
+      const label=(d.categoryLabel||'').trim();
+      if(!label) return includeUncategorized;
+      if(activeCategorySet.size===0) return true;
+      return activeCategorySet.has(label);
+    }
+
+    document.getElementById('filterUncat').addEventListener('change',()=>{includeUncategorized=filterUncat.checked; renderList();});
+    document.getElementById('clearFilterBtn').addEventListener('click',()=>{activeCategorySet.clear(); includeUncategorized=true; rebuildFilterChips(); renderList();});
+
+    /* -------------------- Render Lists -------------------- */
+    function renderList(){
+      hydrateDefaults(organoidData,'organoid');
+      hydrateDefaults(cellData,'cell');
+      hydrateExperiments();
+
+      ongoingList.innerHTML='';
+      completedList.innerHTML='';
+      terminatedList.innerHTML='';
+
+      const source = activeType==='organoid'?organoidData:cellData;
+
+      source.forEach((data,index)=>{
+        if(!passCategoryFilter(data)) return;
+
+        const labelText=(data.categoryLabel||'').trim();
+        const hasColor=(data.categoryColor||'').trim().length>0;
+        const color= hasColor?data.categoryColor:'#7aa2ff';
+        const colorDot=`<span class="dot" style="background:${color}"></span>`;
+        const badge= labelText?`<span class="badge">${colorDot}${labelText}</span>`:(hasColor?`<span class="badge">${colorDot}색상만 지정</span>`:'');
+
+        let header='';
+        if(activeType==='organoid'){
+          const day = data.status==='Completed' && data.completedDay!==undefined ? data.completedDay :
+                      data.status==='Terminated' && data.terminatedDay!==undefined ? data.terminatedDay :
+                      calculateDiff(data.seedingDate);
+          const dayStatus= day>=0? `+${day}일차` : '분화 전';
+          const phase=getPhaseLabel(day);
+          header = `<h4>${dayStatus}${phase?` <span class="badge">${phase}</span>`:''} ${badge}</h4>`;
+        }else{
+          header = `<h4>Cell ${badge}</h4>`
+        }
+
+        const entry=document.createElement('div');
+        entry.className='entry';
+        entry.innerHTML = `
+          <div class="left-bar" style="background:${hasColor?color:'transparent'}"></div>
+          ${header}
+          <div class="meta">
+            ${activeType==='organoid' ? `Cell Seeding 날짜: <strong>${data.seedingDate}</strong><br>` : `Cultivation 날짜: <strong>${data.cultivationDate}</strong><br>`}
+            Passage: <strong>${data.passage}</strong><br>
+            Cell 종류: ${data.cellType}<br>
+            Plate: ${data.plate}<br>
+            비고: ${data.note || ''}
+            ${data.status==='Terminated' && data.terminationReason? `<br>중단 사유: ${data.terminationReason}`:''}
+          </div>
+          <div class="entry-actions">
+            <button class="act edit" data-index="${index}">수정</button>
+            <button class="act" data-role="delete" data-index="${index}">삭제</button>
+            ${data.status==='Ongoing' ? `
+              <button class="act done" data-role="complete" data-index="${index}">완료</button>
+              <button class="act kill" data-role="terminate" data-index="${index}">중단</button>
+            `:''}
+          </div>
+        `;
+
+        if (data.status==='Completed') completedList.appendChild(entry);
+        else if (data.status==='Terminated') terminatedList.appendChild(entry);
+        else ongoingList.appendChild(entry);
+      })
+
+      renderExperimentUI();
+      renderMissions(); // ✅
+    }
+
+    /* -------------------- Tabs & Calendar View Toggle -------------------- */
+    function toggleMainViewsForCalendar(isCal){
+      document.getElementById('mainToolbar').style.display = isCal ? 'none' : 'flex';
+      calendarSection.style.display = isCal ? 'block' : 'none';
+      listsSection.style.display = isCal ? 'none' : 'block';
+      experimentsSection.style.display = isCal ? 'none' : 'block';
+      if(!isCal){
+        const hasActive = !!experimentData.find(e=>e.id===activeExperimentId);
+        expBanner.style.display = hasActive ? 'block' : 'none';
+      }else{
+        expBanner.style.display = 'none';
+      }
+      formCal.hidden = !isCal;
+    }
+
+    function activateTab(type){
+      activeType=type;
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      formOrg.hidden = type!=='organoid';
+      formCel.hidden = type!=='cell';
+      formExp.hidden = type!=='experiment';
+      if(type==='organoid'){ tabOrg.classList.add('active'); }
+      if(type==='cell'){ tabCell.classList.add('active'); }
+      if(type==='experiment'){ tabExp.classList.add('active'); }
+
+      const calOn = type==='calendar';
+      toggleMainViewsForCalendar(calOn);
+
+      if(calOn){
+        renderCalendar();
+      }else{
+        activeCategorySet.clear();
+        includeUncategorized=true;
+        rebuildFilterChips();
+        renderList();
+      }
+    }
+    tabOrg.addEventListener('click',()=>activateTab('organoid'));
+    tabCell.addEventListener('click',()=>activateTab('cell'));
+    tabExp.addEventListener('click',()=>activateTab('experiment'));
+    openCalendarBtn.addEventListener('click',()=>activateTab('calendar'));
+
+    /* -------------------- Preset autofill -------------------- */
+    function hookPreset(selectEl,labelEl,colorEl){
+      selectEl.addEventListener('change',()=>{
+        const key=selectEl.value;
+        if(key && key!=='Custom' && CATEGORY_PRESETS[key]){
+          labelEl.value=CATEGORY_PRESETS[key].label;
+          colorEl.value=CATEGORY_PRESETS[key].color;
+        }else if(key==='Custom'){
+          labelEl.value='';
+          colorEl.value='#7aa2ff';
+        }
+      })
+    }
+    hookPreset(categoryPreset_o, categoryLabel_o, categoryColor_o);
+    hookPreset(categoryPreset_c, categoryLabel_c, categoryColor_c);
+
+    /* -------------------- Submit: Organoid -------------------- */
+    document.getElementById('organoidForm').addEventListener('submit',e=>{
+      e.preventDefault();
+      const presetKey=categoryPreset_o.value;
+      let label=(categoryLabel_o.value||'').trim();
+      let color=categoryColor_o.value||'';
+      if(presetKey && presetKey!=='Custom' && CATEGORY_PRESETS[presetKey]){ const p=CATEGORY_PRESETS[presetKey]; if(!label) label=p.label; if(!color) color=p.color; }
+      const entry={
+        seedingDate: document.getElementById('seedingDate_o').value,
+        passage: document.getElementById('passage_o').value,
+        cellType: document.getElementById('cellType_o').value,
+        plate: document.getElementById('plate_o').value,
+        note: document.getElementById('note_o').value,
+        categoryKey:presetKey||'', categoryLabel:label, categoryColor:color,
+        status:'Ongoing'
+      };
+      if(editIndex_o!==null){
+        const prev=organoidData[editIndex_o];
+        entry.status=prev.status||'Ongoing';
+        if(prev.completedDay!==undefined) entry.completedDay=prev.completedDay;
+        if(prev.terminatedDay!==undefined) entry.terminatedDay=prev.terminatedDay;
+        if(prev.terminationReason!==undefined) entry.terminationReason=prev.terminationReason;
+        organoidData[editIndex_o]=entry; editIndex_o=null;
+      }else{ organoidData.push(entry) }
+      saveAll(); e.target.reset(); categoryColor_o.value='#7aa2ff'; categoryPreset_o.value='';
+      rebuildFilterChips(); renderList();
+    })
+    document.getElementById('resetBtn_o').addEventListener('click',()=>{ document.getElementById('organoidForm').reset(); categoryColor_o.value='#7aa2ff'; categoryPreset_o.value=''; })
+
+    /* -------------------- Submit: Cell -------------------- */
+    document.getElementById('cellForm').addEventListener('submit',e=>{
+      e.preventDefault();
+      const presetKey=categoryPreset_c.value;
+      let label=(categoryLabel_c.value||'').trim();
+      let color=categoryColor_c.value||'';
+      if(presetKey && presetKey!=='Custom' && CATEGORY_PRESETS[presetKey]){ const p=CATEGORY_PRESETS[presetKey]; if(!label) label=p.label; if(!color) color=p.color; }
+      const entry={
+        cultivationDate: document.getElementById('cultivationDate_c').value,
+        passage: document.getElementById('passage_c').value,
+        cellType: document.getElementById('cellType_c').value,
+        plate: document.getElementById('plate_c').value,
+        note: document.getElementById('note_c').value,
+        categoryKey:presetKey||'', categoryLabel:label, categoryColor:color,
+        status:'Ongoing'
+      };
+      if(editIndex_c!==null){
+        const prev=cellData[editIndex_c];
+        entry.status=prev.status||'Ongoing';
+        if(prev.completedDay!==undefined) entry.completedDay=prev.completedDay;
+        if(prev.terminatedDay!==undefined) entry.terminatedDay=prev.terminatedDay;
+        if(prev.terminationReason!==undefined) entry.terminationReason=prev.terminationReason;
+        cellData[editIndex_c]=entry; editIndex_c=null;
+      }else{ cellData.push(entry) }
+      saveAll(); e.target.reset(); categoryColor_c.value='#7aa2ff'; categoryPreset_c.value='';
+      rebuildFilterChips(); renderList();
+    })
+    document.getElementById('resetBtn_c').addEventListener('click',()=>{ document.getElementById('cellForm').reset(); categoryColor_c.value='#7aa2ff'; categoryPreset_c.value=''; })
+
+    /* -------------------- Submit: Experiment -------------------- */
+    document.getElementById('expForm').addEventListener('submit', e=>{
+      e.preventDefault();
+      const entry={
+        id: 'exp_'+Math.random().toString(36).slice(2,10),
+        startDate: document.getElementById('startDate_e').value,
+        expType: document.getElementById('expType_e').value,
+        cellType: document.getElementById('cellType_e').value,
+        markers: document.getElementById('markers_e').value,
+        progress: parseInt(document.getElementById('progressNum_e').value || document.getElementById('progress_e').value, 10) || 0,
+        note: document.getElementById('note_e').value,
+        status: document.getElementById('status_e').value
+      };
+      if(editIndex_e!==null){ experimentData[editIndex_e] = Object.assign({id: experimentData[editIndex_e].id}, entry); editIndex_e=null; }
+      else { experimentData.push(entry); }
+      saveAll(); e.target.reset(); document.getElementById('progress_e').value=0; document.getElementById('progressNum_e').value=0;
+      populateExpPicker(); renderExperimentUI();
+    })
+    document.getElementById('resetBtn_e').addEventListener('click',()=>{ document.getElementById('expForm').reset(); document.getElementById('progress_e').value=0; document.getElementById('progressNum_e').value=0; })
+
+    // Sync progress inputs
+    document.addEventListener('input', e=>{
+      if(e.target.id==='progress_e'){ document.getElementById('progressNum_e').value = e.target.value; }
+      if(e.target.id==='progressNum_e'){ document.getElementById('progress_e').value = e.target.value; }
+    });
+
+    /* -------------------- List Actions (Organoid/Cell) -------------------- */
+    document.addEventListener('click',e=>{
+      const t=e.target; const role=t.getAttribute('data-role');
+      const indexAttr=t.getAttribute('data-index');
+      const index=indexAttr!==null?parseInt(indexAttr):NaN;
+
+      if(activeType==='experiment' || activeType==='calendar') return; // 리스트 액션은 Organoid/Cell에서만
+
+      const source = activeType==='organoid'?organoidData:cellData;
+
+      if(t.classList.contains('edit')){
+        if(isNaN(index)) return; const d=source[index];
+        if(activeType==='organoid'){
+          document.getElementById('seedingDate_o').value=d.seedingDate;
+          document.getElementById('passage_o').value=d.passage;
+          document.getElementById('cellType_o').value=d.cellType;
+          document.getElementById('plate_o').value=d.plate;
+          document.getElementById('note_o').value=d.note||'';
+          categoryPreset_o.value=d.categoryKey||'';
+          categoryLabel_o.value=d.categoryLabel||'';
+          categoryColor_o.value=d.categoryColor||'#7aa2ff';
+          editIndex_o=index; editIndex_c=null; editIndex_e=null; activateTab('organoid');
+        }else{
+          document.getElementById('cultivationDate_c').value=d.cultivationDate;
+          document.getElementById('passage_c').value=d.passage;
+          document.getElementById('cellType_c').value=d.cellType;
+          document.getElementById('plate_c').value=d.plate;
+          document.getElementById('note_c').value=d.note||'';
+          categoryPreset_c.value=d.categoryKey||'';
+          categoryLabel_c.value=d.categoryLabel||'';
+          categoryColor_c.value=d.categoryColor||'#7aa2ff';
+          editIndex_c=index; editIndex_o=null; editIndex_e=null; activateTab('cell');
+        }
+        window.scrollTo({top:0,behavior:'smooth'});
+      }
+
+      if(role==='delete' && !isNaN(index)){
+        source.splice(index,1); saveAll(); renderList(); rebuildFilterChips();
+      }
+
+      if(role==='complete' && !isNaN(index)){
+        const dateStr=prompt('완료 날짜를 입력하세요 (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+        if(dateStr){
+          if(activeType==='organoid'){
+            const completedDate=new Date(dateStr);
+            const seedDate=new Date(source[index].seedingDate); seedDate.setDate(seedDate.getDate()+1);
+            const diffDays=Math.floor((completedDate-seedDate)/(1000*60*60*24));
+            source[index].status='Completed'; source[index].completedDay=diffDays;
+          }else{ source[index].status='Completed'; }
+          saveAll(); renderList();
+        }
+      }
+
+      if(role==='terminate' && !isNaN(index)){
+        const reason=prompt('중단 사유를 입력하세요:');
+        const dateStr=prompt('중단 날짜를 입력하세요 (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+        if(reason && dateStr){
+          if(activeType==='organoid'){
+            const terminatedDate=new Date(dateStr);
+            const seedDate=new Date(source[index].seedingDate); seedDate.setDate(seedDate.getDate()+1);
+            const diffDays=Math.floor((terminatedDate-seedDate)/(1000*60*60*24));
+            source[index].status='Terminated'; source[index].terminationReason=reason; source[index].terminatedDay=diffDays;
+          }else{ source[index].status='Terminated'; source[index].terminationReason=reason; }
+          saveAll(); renderList();
+        }
+      }
+    })
+
+    /* -------------------- Experiments: Picker & List -------------------- */
+    function populateExpPicker(){
+      const sel = expPicker; sel.innerHTML = '';
+      const opt0 = document.createElement('option'); opt0.value=''; opt0.textContent='선택 안 함'; sel.appendChild(opt0);
+      experimentData.forEach(e=>{
+        const o=document.createElement('option'); o.value=e.id; o.textContent=`${e.expType} · ${e.cellType} (${e.progress||0}%)`;
+        sel.appendChild(o);
+      });
+      sel.value = activeExperimentId || '';
+    }
+
+    function renderExperimentUI(){
+      hydrateExperiments();
+
+      // Banner
+      const active = experimentData.find(e=>e.id===activeExperimentId);
+      if(active){
+        expBannerType.textContent = active.expType || '';
+        expBannerMeta.textContent = active.cellType? `· ${active.cellType}` : '';
+        expBannerBar.style.width = `${active.progress||0}%`;
+        expBannerPct.textContent = `${active.progress||0}%`;
+        if(activeType!=='calendar') expBanner.style.display = 'block';
+      }else{
+        expBanner.style.display = 'none';
+      }
+
+      // ✅ 상태별 리스트 초기화
+      expOngoingList.innerHTML = '';
+      expCompletedList.innerHTML = '';
+      expTerminatedList.innerHTML = '';
+
+      // 카드 빌더
+      function buildCard(e, idx){
+        const card = document.createElement('div');
+        card.className = 'entry';
+        card.innerHTML = `
+          <div class="left-bar" style="background:linear-gradient(180deg, var(--primary), var(--accent))"></div>
+          <h4>${e.expType || 'Experiment'} <span class="badge">${e.progress||0}%</span></h4>
+          <div class="meta">
+            최초 시작 날짜: <strong>${e.startDate || ''}</strong><br>
+            Cell 종류: ${e.cellType || ''}<br>
+            Marker: ${e.markers || ''}<br>
+            상태: ${e.status || 'Ongoing'}<br>
+            비고: ${e.note || ''} 
+            ${e.terminationReason ? `<br>중단 사유: ${e.terminationReason}` : ''}
+            <div style="margin-top:10px; height:10px; border-radius:999px; background:#1c2542; overflow:hidden">
+              <div style="height:100%; width:${e.progress||0}%; background:linear-gradient(90deg, var(--primary), var(--accent))"></div>
+            </div>
+          </div>
+          <div class="entry-actions">
+            <button class="act" data-exp="edit" data-index="${idx}">수정</button>
+            <button class="act" data-exp="delete" data-index="${idx}">삭제</button>
+            <button class="act done" data-exp="set-active" data-index="${idx}">상단에 표시</button>
+            ${ (e.status||'Ongoing')==='Ongoing' ? `
+              <button class="act done" data-exp="complete" data-index="${idx}">완료</button>
+              <button class="act kill" data-exp="terminate" data-index="${idx}">중단</button>` : ''
+            }
+          </div>
+        `;
+        return card;
+      }
+
+      experimentData.forEach((e, idx)=>{
+        const card = buildCard(e, idx);
+        if((e.status||'Ongoing')==='Completed') expCompletedList.appendChild(card);
+        else if((e.status||'Ongoing')==='Terminated') expTerminatedList.appendChild(card);
+        else expOngoingList.appendChild(card);
+      });
+
+      populateExpPicker();
+      renderMissions(); // ✅
+    }
+
+    document.addEventListener('click', e=>{
+      const t=e.target;
+      if(t.getAttribute('data-exp')==='edit'){
+        const idx = parseInt(t.getAttribute('data-index'));
+        const d = experimentData[idx];
+        document.getElementById('startDate_e').value = d.startDate || '';
+        document.getElementById('expType_e').value = d.expType || '';
+        document.getElementById('cellType_e').value = d.cellType || '';
+        document.getElementById('markers_e').value = d.markers || '';
+        document.getElementById('progress_e').value = d.progress || 0;
+        document.getElementById('progressNum_e').value = d.progress || 0;
+        document.getElementById('note_e').value = d.note || '';
+        document.getElementById('status_e').value = d.status || 'Ongoing';
+        editIndex_e = idx; activateTab('experiment'); window.scrollTo({top:0, behavior:'smooth'});
+      }
+      if(t.getAttribute('data-exp')==='delete'){
+        const idx = parseInt(t.getAttribute('data-index'));
+        experimentData.splice(idx,1); saveAll(); renderExperimentUI();
+      }
+      if(t.getAttribute('data-exp')==='set-active'){
+        const idx = parseInt(t.getAttribute('data-index'));
+        activeExperimentId = experimentData[idx]?.id || '';
+        saveAll(); renderExperimentUI(); populateExpPicker();
+      }
+      // ✅ 실험 상태 변경 액션
+      if(t.getAttribute('data-exp')==='complete'){
+        const idx = parseInt(t.getAttribute('data-index'));
+        if(!isNaN(idx)){ experimentData[idx].status='Completed'; saveAll(); renderExperimentUI(); }
+      }
+      if(t.getAttribute('data-exp')==='terminate'){
+        const idx = parseInt(t.getAttribute('data-index'));
+        if(!isNaN(idx)){
+          const reason = prompt('중단 사유를 입력하세요 (선택):','');
+          experimentData[idx].status='Terminated';
+          if(reason) experimentData[idx].terminationReason = reason;
+          saveAll(); renderExperimentUI();
+        }
+      }
+    });
+
+    expPicker.addEventListener('change', (e)=>{ activeExperimentId = e.target.value || ''; saveAll(); renderExperimentUI(); });
+    expClear.addEventListener('click', ()=>{ activeExperimentId = ''; saveAll(); renderExperimentUI(); populateExpPicker(); });
+
+    /* -------------------- Calendar -------------------- */
+    const WEEK = ['일','월','화','수','목','금','토'];
+    let view = new Date();              // 현재 표시 월
+    let selectedDate = new Date();      // 선택된 날짜 (커서)
+    let selectedCellEl = null;          // 선택된 셀 DOM
+
+    function buildHead(){
+      calHead.innerHTML='';
+      WEEK.forEach(w=>{
+        const h=document.createElement('div'); h.className='cal-head'; h.textContent=w; calHead.appendChild(h);
+      })
+    }
+    function eventsOn(dayStr){
+      return calendarEvents
+        .filter(e=>e.date===dayStr)
+        .sort((a,b)=> (a.start||'').localeCompare(b.start||''));
+    }
+    function setSelected(dateObj, cellEl){
+      if(selectedCellEl) selectedCellEl.classList.remove('selected');
+      selectedDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+      selectedCellEl = cellEl;
+      if(selectedCellEl) selectedCellEl.classList.add('selected');
+      evDate.value = ymd(selectedDate); // 폼 날짜 동기화
+      renderSelectedPanel();
+    }
+    function renderMonth(){
+      const year = view.getFullYear(); const month = view.getMonth();
+      monthLabel.textContent = `${year}년 ${month+1}월`;
+      calGrid.innerHTML='';
+
+      const first = new Date(year, month, 1);
+      const startDay = first.getDay();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+
+      for(let i=0;i<startDay;i++){
+        const c=document.createElement('div'); c.className='cal-cell'; c.style.visibility='hidden'; calGrid.appendChild(c);
+      }
+
+      for(let d=1; d<=daysInMonth; d++){
+        const dateObj = new Date(year, month, d);
+        const dateStr = ymd(dateObj);
+
+        const cell = document.createElement('div');
+        cell.className='cal-cell';
+        if(dateStr===ymd(new Date())) cell.classList.add('today');
+        if(ymd(selectedDate)===dateStr){ cell.classList.add('selected'); selectedCellEl = cell; }
+
+        const head = document.createElement('div'); head.className='date'; head.textContent = `${d}`;
+        cell.appendChild(head);
+
+        const list = eventsOn(dateStr);
+        list.slice(0,3).forEach(ev=>{
+          const pill = document.createElement('div'); pill.className='pill';
+          pill.innerHTML = `<span class="dot" style="background:${ev.color||'#7aa2ff'}"></span>${ev.title}`;
+          cell.appendChild(pill);
+        });
+        if(list.length>3){
+          const more=document.createElement('div');
+          more.style.fontSize='12px'; more.style.color='var(--muted)';
+          more.textContent = `+${list.length-3}개`;
+          cell.appendChild(more);
+        }
+
+        cell.addEventListener('click', ()=> setSelected(dateObj, cell));
+        calGrid.appendChild(cell);
+      }
+
+      renderTodayPanel();
+      renderSelectedPanel();
+      renderMissions(); // ✅
+    }
+    function renderTodayPanel(){
+      const t = ymd(new Date());
+      const list = eventsOn(t);
+      todayList.innerHTML = list.length? '' : '<div class="muted" style="font-size:13px">오늘 일정이 없습니다.</div>';
+      list.forEach((ev)=>{
+        const idx = calendarEvents.indexOf(ev);
+        const item=document.createElement('div');
+        item.className='entry';
+        item.innerHTML = `<strong>${ev.title}</strong> <span class="muted" style="font-size:12px">${ev.start||''}${ev.end?` ~ ${ev.end}`:''}</span><br>${ev.note||''}
+          <div class="entry-actions">
+            <button class="act edit" data-ev-edit="${idx}">수정</button>
+            <button class="act kill" data-ev-del="${idx}">삭제</button>
+          </div>`;
+        todayList.appendChild(item);
+      })
+    }
+    function renderSelectedPanel(){
+      const selStr = ymd(selectedDate);
+      selectedDateLabel.textContent = selStr;
+      const list = eventsOn(selStr);
+      selectedList.innerHTML = list.length? '' : '<div class="muted" style="font-size:13px">선택한 날짜의 일정이 없습니다.</div>';
+      list.forEach((ev)=>{
+        const idx = calendarEvents.indexOf(ev);
+        const item=document.createElement('div'); item.className='entry';
+        item.innerHTML = `<strong><span class="pill"><span class="dot" style="background:${ev.color||'#7aa2ff'}"></span>${ev.title}</span></strong>
+          <div class="muted" style="font-size:12px; margin-top:4px">${ev.start||''}${ev.end?` ~ ${ev.end}`:''}</div>
+          <div style="margin-top:4px">${ev.note||''}</div>
+          <div class="entry-actions">
+            <button class="act edit" data-ev-edit="${idx}">수정</button>
+            <button class="act kill" data-ev-del="${idx}">삭제</button>
+          </div>`;
+        selectedList.appendChild(item);
+      })
+    }
+    function renderCalendar(){
+      buildHead();
+      renderMonth();
+      evDate.value = ymd(selectedDate);
+    }
+
+    // month nav
+    prevMonthBtn.addEventListener('click', ()=>{ view = new Date(view.getFullYear(), view.getMonth()-1, 1); renderMonth(); });
+    nextMonthBtn.addEventListener('click', ()=>{ view = new Date(view.getFullYear(), view.getMonth()+1, 1); renderMonth(); });
+    todayBtn.addEventListener('click', ()=>{
+      const t=new Date();
+      view = new Date(t.getFullYear(), t.getMonth(), 1);
+      selectedDate = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+      renderMonth();
+      const el = calGrid.querySelector(`.cal-cell.selected`);
+      if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+    });
+
+    // add/update event
+    eventForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const item = {
+        id: evId.value || ('ev_' + Math.random().toString(36).slice(2,10)),
+        title: (evTitle.value||'').trim(),
+        date: evDate.value,
+        start: evStart.value || '',
+        end: evEnd.value || '',
+        color: evColor.value || '#7aa2ff',
+        note: evNote.value || ''
+      };
+      if(!item.title || !item.date){ alert('제목과 날짜는 필수입니다.'); return; }
+
+      if(evId.value){
+        const idx = calendarEvents.findIndex(x=>x.id===evId.value);
+        if(idx>-1) calendarEvents[idx]=item;
+      }else{
+        calendarEvents.push(item);
+      }
+      saveAll();
+
+      eventForm.reset(); evColor.value='#7aa2ff'; evId.value=''; evSubmitBtn.textContent='추가';
+      renderMonth();
+    });
+    evResetBtn.addEventListener('click', ()=>{
+      eventForm.reset(); evColor.value='#7aa2ff'; evId.value=''; evSubmitBtn.textContent='추가';
+      evDate.value = ymd(selectedDate);
+    });
+
+    // edit/delete delegation
+    document.addEventListener('click', (e)=>{
+      const delIdx = e.target.getAttribute('data-ev-del');
+      if(delIdx!==null && delIdx!==undefined){
+        const idx = parseInt(delIdx,10);
+        if(!isNaN(idx)){ calendarEvents.splice(idx,1); saveAll(); renderMonth(); }
+      }
+      const editIdx = e.target.getAttribute('data-ev-edit');
+      if(editIdx!==null && editIdx!==undefined){
+        const idx = parseInt(editIdx,10);
+        if(!isNaN(idx)){
+          const ev = calendarEvents[idx];
+          evId.value = ev.id;
+          evTitle.value = ev.title || '';
+          evDate.value = ev.date || ymd(selectedDate);
+          evStart.value = ev.start || '';
+          evEnd.value = ev.end || '';
+          evColor.value = ev.color || '#7aa2ff';
+          evNote.value = ev.note || '';
+          evSubmitBtn.textContent='수정 저장';
+
+          const parts = (ev.date||ymd(new Date())).split('-');
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+          view = new Date(d.getFullYear(), d.getMonth(), 1);
+          selectedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          renderMonth();
+          const selCell = calGrid.querySelector(`.cal-cell.selected`);
+          if(selCell) selCell.scrollIntoView({block:'nearest', behavior:'smooth'});
+        }
+      }
+    });
+
+    /* -------------------- ✅ 오늘의 Mission -------------------- */
+    function buildTodayMissions(){
+      const missions = [];
+      const today = new Date();
+      const todayStr = ymd(today);
+
+      // 1) Organoid 단계 알림 (Ongoing만, VitA는 7일차 최초만)
+      organoidData
+        .filter(d=> (d.status||'Ongoing')==='Ongoing' && d.seedingDate)
+        .forEach(d=>{
+          const day = calculateDiff(d.seedingDate);
+          const cat = (d.categoryLabel||'').trim();
+          const prefix = cat ? `[${cat}] ` : '';
+          if(day===0) missions.push(`오늘은 ${prefix}${d.cellType}에 CHIR를 투여하는 날입니다.`);
+          else if(day===2) missions.push(`오늘은 ${prefix}${d.cellType}에 IWP-2를 투여하는 날입니다.`);
+          else if(day===4 || day===5) missions.push(`오늘은 ${prefix}${d.cellType}에 -Ins 처리하는 날입니다.`);
+          else if(day===7) missions.push(`오늘은 ${prefix}${d.cellType}에 -VitA 최초 투여일입니다.`);
+        });
+
+      // 2) 캘린더 오늘 일정
+      const todays = (calendarEvents||[]).filter(ev=>ev.date===todayStr);
+      todays.forEach(ev=>{
+        const time = ev.start ? ` (${ev.start}${ev.end?` ~ ${ev.end}`:''})` : '';
+        missions.push(`오늘은 '${ev.title}'${time} 일정이 예정되어 있습니다.`);
+      });
+
+      // 3) 매주 수요일 랩미팅
+      if(today.getDay()===3){ missions.push(`랩미팅이 예정되어 있습니다. (매주 수요일)`); }
+
+      // 4) Ongoing Cell 미디어 교체 (종류별 중복 제거)
+      const cellTypes = Array.from(new Set(
+        (cellData||[]).filter(c=> (c.status||'Ongoing')==='Ongoing').map(c=>c.cellType).filter(Boolean)
+      ));
+      cellTypes.forEach(t=> missions.push(`(${t})의 Media를 교체해야 합니다.`));
+
+      return missions;
+    }
+    function renderMissions(){
+      const list = document.getElementById('missionList');
+      if(!list) return;
+      const missions = buildTodayMissions();
+      list.innerHTML = '';
+      if(!missions.length){ list.innerHTML = '<li class="muted">오늘 수행할 미션이 없습니다.</li>'; return; }
+      missions.forEach(m=>{ const li=document.createElement('li'); li.textContent=m; list.appendChild(li); });
+    }
+
+    /* -------------------- Init -------------------- */
+    function populateExpPicker(){
+      const sel = expPicker; sel.innerHTML = '';
+      const opt0 = document.createElement('option'); opt0.value=''; opt0.textContent='선택 안 함'; sel.appendChild(opt0);
+      experimentData.forEach(e=>{
+        const o=document.createElement('option'); o.value=e.id; o.textContent=`${e.expType} · ${e.cellType} (${e.progress||0}%)`;
+        sel.appendChild(o);
+      });
+      sel.value = activeExperimentId || '';
+    }
+    function initialDraw(){
+      hydrateDefaults(organoidData,'organoid');
+      hydrateDefaults(cellData,'cell');
+      hydrateExperiments();
+      rebuildFilterChips();
+      renderList();
+      populateExpPicker();
+      renderExperimentUI();
+      renderCalendar();   // 캘린더 선렌더
+      renderMissions();   // 첫 미션 표시
+    }
+    initialDraw();
+  </script>
 </body>
 </html>
