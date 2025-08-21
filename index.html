@@ -1302,8 +1302,6 @@ document.getElementById('organoidForm').addEventListener('submit', async e=>{
       missions.forEach(m=>{ const li=document.createElement('li'); li.textContent=m; list.appendChild(li); });
     }
 
-
-    <script>
 /* =============== AUTH =============== */
 const authModal = document.getElementById('authModal');
 const btnOpenAuth = document.getElementById('btnOpenAuth');
@@ -1657,7 +1655,31 @@ async function dbDeleteEvent(id){
     <div id="authMsg" class="muted" style="margin-top:8px"></div>
   </div>
 </div>
+
+<!-- Auth Modal: </body> 바로 위에 추가 -->
+<div id="authModal" style="position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.45); z-index:9999">
+  <div class="panel" style="width:380px">
+    <h3 style="margin-top:0">로그인 / 회원가입</h3>
+    <div class="row">
+      <div>
+        <label>이메일</label>
+        <input type="email" id="authEmailInput" placeholder="you@example.com">
+      </div>
+      <div>
+        <label>비밀번호</label>
+        <input type="password" id="authPwInput" placeholder="8자 이상">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:12px">
+      <button id="btnSignIn" class="btn btn-primary">로그인</button>
+      <button id="btnSignUp" class="btn btn-ghost">회원가입</button>
+      <button id="btnCloseAuth" class="btn btn-ghost" style="margin-left:auto">닫기</button>
+    </div>
+    <div id="authMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+</div>
   
 </body>
 </html>
+
 
